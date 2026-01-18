@@ -21,4 +21,11 @@ export const createUserSchema = z.object({
     .default('MXN')
 })
 
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+
+
 export type CreateUserDto = z.infer<typeof createUserSchema>;
+export type LoginDto = z.infer<typeof loginSchema>;
