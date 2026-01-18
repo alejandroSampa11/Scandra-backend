@@ -1,0 +1,93 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 2. Modelo de Usuario
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  passwordHash  String    // Nunca guardes la contraseña en texto plano
+  fullName      String?
+  currency      String    @default("MXN") // Preferencia de moneda
+  createdAt     DateTime  @default(now())
+  
+  // Relaciones
+  expenses      Expense[]
+  categories    Category[]
+  paymentMethods PaymentMethod[]
+}
+
+// 3. Modelo de Categoría
+// Permite categorías globales (sistema) y personalizadas (usuario)
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    // Ej: "Comida", "Transporte"
+  icon        String?   // Nombre del icono (ej: "fast-food-outline" para Expo Icons)
+  color       String?   // Hex code para la UI: "#FF5733"
+  isSystem    Boolean   @default(false) // Si es true, es visible para todos
+  
+  // Relación con usuario (opcional, si es null es global)
+  userId      Int?      
+  user        User?     @relation(fields: [userId], references: [id])
+  
+  expenses    Expense[]
+}
+
+// 4. Modelo de Método de Pago
+model PaymentMethod {
+  id          Int       @id @default(autoincrement())
+  name        String    // Ej: "Banamex Débito", "Efectivo", "AMEX"
+  last4Digits String?   // Opcional, para identificar tarjetas
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  expenses    Expense[]
+}
+
+// 5. El Núcleo: Modelo de Gasto
+model Expense {
+  id          Int       @id @default(autoincrement())
+  
+  // Datos Financieros
+  amount      Decimal   @db.Decimal(10, 2) // SIEMPRE Decimal para dinero (10 dígitos, 2 decimales)
+  date        DateTime  @default(now())
+  merchant    String?   // Nombre del comercio detectado o ingresado (Ej: OXXO)
+  description String?   // Notas adicionales del usuario
+  
+  // Datos del Escaneo (OCR)
+  receiptUrl  String?   // URL de la imagen en S3/Cloudinary
+  ocrRawData  Json?     // Guardamos la respuesta cruda de la IA por si queremos depurar después
+  
+  // Estado del Gasto
+  status      ExpenseStatus @default(DRAFT) 
+  
+  // Relaciones
+  userId          Int
+  user            User           @relation(fields: [userId], references: [id])
+  
+  categoryId      Int?
+  category        Category?      @relation(fields: [categoryId], references: [id])
+  
+  paymentMethodId Int?
+  paymentMethod   PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// 6. Enums para control de estado
+enum ExpenseStatus {
+  DRAFT     // Recién escaneado, el usuario aún no confirma si los datos son correctos
+  CONFIRMED // El usuario revisó y guardó el gasto
+  REJECTED  // El escaneo salió mal y el usuario lo descartó
+}
